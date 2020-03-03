@@ -7,8 +7,31 @@ import numpy as np
 IMG_1_PATH = "project_images/Rainier1.png"
 IMG_2_PATH = "project_images/Rainier2.png"
 
-#Uses openCV's SIFT implementation to get keypoints in two images and matches them using ratio test
+#Uses openCV's ORB implementation to get keypoints and make their descriptors
+def findFeatures(img, debug = False):
+	gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+
+	orb = cv.ORB_create()
+	#keypoints = orb.detect(gray, None)
+	keypoints, descriptors = orb.detectAndCompute(img, None)
+
+	if debug:
+		result = cv.drawKeypoints(img, keypoints, None, color=(0,255,0), flags=0)
+		cv.imshow("Keypoints", result)
+
+	return keypoints, descriptors
+
+
+#Uses ratio test to match images
 def findMatches(img1, img2):
+	kp1, desc1 = findFeatures(img1)
+	kp2, desc2 = findFeatures(img2)
+
+	matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck = True)
+	matcher.match(desc1, desc2)
+
+	
+
 	return 0
 
 
@@ -42,6 +65,8 @@ def stitch(image1, image2, hom, homInv, stitchedImage):
 def main():
 	img1 = cv.imread(IMG_1_PATH)
 	img2 = cv.imread(IMG_2_PATH)
+
+	findMatches(img1, img2)
 
 	cv.waitKey(0)
 	cv.destroyAllWindows()
