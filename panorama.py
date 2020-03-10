@@ -11,9 +11,12 @@ IMG_2_PATH = "project_images/Rainier2.png"
 def findFeatures(img, debug = False):
 	gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
-	orb = cv.ORB_create()
+	#NOTE: I compiled openCV with contrib and the ENABLE_NON_FREE tag
+	sift = cv.xfeatures2d.SIFT_create()
+
+	#orb = cv.ORB_create()
 	#keypoints = orb.detect(gray, None)
-	keypoints, descriptors = orb.detectAndCompute(img, None)
+	keypoints, descriptors = sift.detectAndCompute(gray, None)
 
 	if debug:
 		result = cv.drawKeypoints(img, keypoints, None, color=(0,255,0), flags=0)
@@ -27,8 +30,8 @@ def findMatches(img1, img2):
 	kp1, desc1 = findFeatures(img1)
 	kp2, desc2 = findFeatures(img2)
 
-	matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck = True)
-	matcher.match(desc1, desc2)
+	#matcher = cv.BFMatcher(cv.NORM_HAMMING, crossCheck = True)
+	#matcher.match(desc1, desc2)
 
 	
 
