@@ -6,6 +6,7 @@ import numpy as np
 
 IMG_1_PATH = "project_images/Rainier1.png"
 IMG_2_PATH = "project_images/Rainier2.png"
+RESULTS_DIR = "results/"
 
 #utility function to show an image and wait for key press
 def showImg(title, img):
@@ -13,45 +14,51 @@ def showImg(title, img):
 	cv.waitKey(0)
 
 #Uses openCV's ORB implementation to get keypoints and make their descriptors
-def findFeatures(img, debug = False):
+def findFeatures(img, save, debug = False):
 	gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
 
 	#NOTE: I compiled openCV with contrib and the ENABLE_NON_FREE tag
 	sift = cv.xfeatures2d.SIFT_create()
 
-	#orb = cv.ORB_create()
-	#keypoints = orb.detect(gray, None)
 	keypoints, descriptors = sift.detectAndCompute(gray, None)
 
+	result = cv.drawKeypoints(img, keypoints, None, color=(0,255,0), flags=0)
+
 	if debug:
-		result = cv.drawKeypoints(img, keypoints, None, color=(0,255,0), flags=0)
 		showImg("Keypoints", result)
+
+	if save is not None:
+		cv.imwrite(save, result) 
 
 	return keypoints, descriptors
 
 
 #Uses ratio test to match images
+#Returns a list of DMatch objects
 def findMatches(img1, img2, debug = False):
-	kp1, desc1 = findFeatures(img1, debug)
-	kp2, desc2 = findFeatures(img2, debug)
+	kp1, desc1 = findFeatures(img1, RESULTS_DIR + "1b.png", debug)
+	kp2, desc2 = findFeatures(img2, RESULTS_DIR + "1c.png", debug)
 
 	matcher = cv.BFMatcher()
+	matches = matcher.knnMatch(desc1, desc2, k=2)	#to apply ratio test, we need k = 2
 
-	#to apply ratio test, k = 2
-	matches = matcher.knnMatch(desc1, desc2, k=2)
+	ratio = 0.8 	#proposed by David Lowe in his paper
 
-	#This is taken directly from openCV documentation. try to make it your own!
-	good = []
+	goodMatches = []
 
-	for m, n in matches:
-		if m.distance < 0.75*n.distance:
-			good.append([m])
+	for i in range(len(matches)):
+		if matches[i][0].distance < ratio * matches[i][1].distance:
+			goodMatches.append(matches[i][0])
+
+
+	resultImg = cv.drawMatches(img1, kp1, img2, kp2, goodMatches, None)
 
 	if debug:
-		matchImg = cv.drawMatchesKnn(img1, kp1, img2, kp2, good, None, flags=2)
-		showImg("Matches", matchImg)
+		showImg("Matches", resultImg)
 
-	return good
+	cv.imwrite(RESULTS_DIR + "2.png", resultImg)
+
+	return goodMatches
 
 
 #From pdf:
@@ -85,9 +92,14 @@ def main():
 	img1 = cv.imread(IMG_1_PATH)
 	img2 = cv.imread(IMG_2_PATH)
 
+
+	#Mandatory step 1: find features of boxes, save in 1a.png
+	findFeatures(cv.imread("project_images/Boxes.png"), RESULTS_DIR + "1a.png", True)
+
+	#Mandatory step 2: find features of mount rainier 1, save in 1b.png
+	#Mandatory step 3: find features of mount rainier 2, save in 1c.png
 	matches = findMatches(img1, img2, True)
 
-	cv.waitKey(0)
 	cv.destroyAllWindows()
 
 if __name__ == '__main__':
