@@ -63,9 +63,22 @@ def findMatches(img1, img2, debug = False):
 
 #From pdf:
 # Projects point (x1, y1) using the homography H. 
-# Returns the projected point (x2, y2)
-def project(x1, y1, H, x2, y2):
-	return 0
+# Returns the projected point p (x2, y2)
+def project(x1, y1, H):
+	#h = [ a b c 
+	#	   d e f
+	#	   g h 1 ]
+	#
+	# p = [x y (1)]
+	#
+	# newP = [u v w]
+	# x2 = u / w
+	# y2 = v / w
+
+	newP = np.matmul(H, [x1, y1, 1])
+
+
+	return (newP[0] / newP[2]), (newP[1] / newP[2])
 
 
 #From pdf:
