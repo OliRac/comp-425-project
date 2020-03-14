@@ -13,6 +13,17 @@ def showImg(title, img):
 	cv.imshow(title, img)
 	cv.waitKey(0)
 
+
+#Builds a list of keypoint objects from a list of dMatch objects#
+#dMatch only contains keypoint indices; they do not contain information like x, y, z position
+def buildMatchList(dMatchList, kpList1, kpList2):
+	matches = []
+
+	for dm in dMatchList:
+		matches.append((kpList1[dm.queryIdx],kpList2[dm.trainIdx]))
+
+	return matches
+
 #Uses openCV's ORB implementation to get keypoints and make their descriptors
 def findFeatures(img, save, debug = False):
 	gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
@@ -58,12 +69,12 @@ def findMatches(img1, img2, debug = False):
 
 	cv.imwrite(RESULTS_DIR + "2.png", resultImg)
 
-	return goodMatches
+	return buildMatchList(goodMatches, kp1, kp2)
 
 
 #From pdf:
 # Projects point (x1, y1) using the homography H. 
-# Returns the projected point p (x2, y2)
+# Returns the projected point newP (x2, y2)
 def project(x1, y1, H):
 	#h = [ a b c 
 	#	   d e f
@@ -71,7 +82,7 @@ def project(x1, y1, H):
 	#
 	# p = [x y (1)]
 	#
-	# newP = [u v w]
+	# newP = h * p = [u v w]
 	# x2 = u / w
 	# y2 = v / w
 
@@ -87,7 +98,16 @@ def project(x1, y1, H):
 # If the projected point is less than the distance "inlierThreshold" from the second point, it is an inlier. 
 # Returns the total number of inliers.
 def computeInlierCount(H, matches, numMatches, inlierThreshold):
-	return 0
+	inliers = 0
+
+	for m in matches:
+		projection = project(m[0].pt.x, m[0].pt.y, H)
+		distSq = (projection[0] - m[1].pt.x)**2 + (projection[1] - m[1].pt.y)**2 
+
+		if distSq < inlierThreshold:
+			inliers += 1
+
+	return inliers
 
 
 # takes a list of potentially matching points between two images 
@@ -105,13 +125,14 @@ def main():
 	img1 = cv.imread(IMG_1_PATH)
 	img2 = cv.imread(IMG_2_PATH)
 
+	debug = False
 
 	#Mandatory step 1: find features of boxes, save in 1a.png
-	findFeatures(cv.imread("project_images/Boxes.png"), RESULTS_DIR + "1a.png", True)
+	findFeatures(cv.imread("project_images/Boxes.png"), RESULTS_DIR + "1a.png", debug)
 
 	#Mandatory step 2: find features of mount rainier 1, save in 1b.png
 	#Mandatory step 3: find features of mount rainier 2, save in 1c.png
-	matches = findMatches(img1, img2, True)
+	matches = findMatches(img1, img2, debug)
 
 	cv.destroyAllWindows()
 
