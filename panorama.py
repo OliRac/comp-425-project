@@ -70,7 +70,7 @@ def findMatches(img1, img2, debug = False):
 
 	cv.imwrite(RESULTS_DIR + "2.png", resultImg)
 
-	return buildMatchList(goodMatches, kp1, kp2)
+	return goodMatches, kp1, kp2
 
 
 #From pdf:
@@ -98,12 +98,12 @@ def project(x1, y1, H):
 # That is, project the first point in each match using the function "project". 
 # If the projected point is less than the distance "inlierThreshold" from the second point, it is an inlier. 
 # Returns the total number of inliers.
-def computeInlierCount(H, matches, inlierThreshold):
+def computeInlierCount(H, matches, inlierThreshold, keypoints1, keypoints2):
 	inliers = 0
 
 	for m in matches:
-		projection = project(m[0].pt[0], m[0].pt[1], H)
-		distSq = (projection[0] - m[1].pt[0])**2 + (projection[1] - m[1].pt[1])**2 
+		projection = project(keypoints1[m.queryIdx].pt[0], keypoints1[m.queryIdx].pt[1], H)
+		distSq = (projection[0] - keypoints1[m.trainIdx].pt[0])**2 + (projection[1] - keypoints1[m.trainIdx].pt[1])**2 
 
 		if distSq < inlierThreshold:
 			inliers += 1
@@ -114,22 +114,22 @@ def computeInlierCount(H, matches, inlierThreshold):
 def showInliers(img1, img2, H, matches, inlierThreshold):
 	return 0;
 
-#Nearly identical to computeInliercount, but returns a list of inliers instead of a count
-def findInliers(matches, H, inlierThreshold):
+#Nearly identical to computeInliercount, but returns a list of inliers instead of a count. Perhaps make the previous return the list and just use len()...
+def findInliers(matches, H, inlierThreshold, keypoints1, keypoints2):
 	inliers = []
 
 	for m in matches:
-		projection = project(m[0].pt[0], m[0].pt[1], H)
-		distSq = (projection[0] - m[1].pt[0])**2 + (projection[1] - m[1].pt[1])**2 
+		projection = project(keypoints1[m.queryIdx].pt[0], keypoints1[m.queryIdx].pt[1], H)
+		distSq = (projection[0] - keypoints1[m.trainIdx].pt[0])**2 + (projection[1] - keypoints1[m.trainIdx].pt[1])**2 
 
 		if distSq < inlierThreshold:
-			inliers.append((m[0], m[1]))
+			inliers.append(m)
 
 	return inliers
 
 # takes a list of potentially matching points between two images 
 # returns the homography transformation and its inverse. 
-def RANSAC (matches, numIterations, inlierThreshold, img1, img2):
+def RANSAC (matches, numIterations, inlierThreshold, img1, img2, keypoints1, keypoints2):
 	bestH = np.zeros((3,3))
 
 	numMatches = len(matches)
@@ -142,17 +142,19 @@ def RANSAC (matches, numIterations, inlierThreshold, img1, img2):
 	#	compute the number of inliers from this homography
 	#	get the maximum number of inliers
 
-	for i in range(numIterations):
-		src = np.zeros((4, 2))
-		dst = np.zeros((4, 2))
+	sampleSize = 4
 
-		for i in range(4):
+	for i in range(numIterations):
+		src = np.zeros((sampleSize, 2))
+		dst = np.zeros((sampleSize, 2))
+
+		for i in range(sampleSize):
 			idx = random.randint(0, numMatches-1)
-			src[i] = matches[idx][0].pt
-			dst[i] = matches[idx][1].pt
+			src[i] = keypoints1[matches[idx].queryIdx].pt
+			dst[i] = keypoints2[matches[idx].trainIdx].pt
 
 		currH = cv.findHomography(src, dst, 0)[0]
-		currInliers = computeInlierCount(currH, matches, inlierThreshold)
+		currInliers = computeInlierCount(currH, matches, inlierThreshold, keypoints1, keypoints2)
 
 		if currInliers > inliersMax:
 			bestH = currH
@@ -162,14 +164,15 @@ def RANSAC (matches, numIterations, inlierThreshold, img1, img2):
 	#find matches that are inliers using the "best" homography and the specified threshold
 	#compute another homography with all of the inliers (not just 4 points)
 
-	inliers = findInliers(matches, bestH, inlierThreshold)
+	inliers = findInliers(matches, bestH, inlierThreshold, keypoints1, keypoints2)
 
-	src = np.array([i[0].pt for i in inliers])
-	dst = np.array([i[1].pt for i in inliers])
+	#src = np.array([i[0].pt for i in inliers])
+	#dst = np.array([i[1].pt for i in inliers])
 
-	bestH = cv.findHomography(src, dst, 0)[0]
+	#bestH = cv.findHomography(src, dst, 0)[0]
 
 	#Finally, displaying the inlier matches
+	#inlierImg = cv.drawMatches()
 
 	return bestH, np.linalg.inv(bestH)
 
@@ -197,9 +200,9 @@ def main():
 
 	#Mandatory step 2: find features of mount rainier 1, save in 1b.png
 	#Mandatory step 3: find features of mount rainier 2, save in 1c.png
-	matches = findMatches(img1, img2, debug)
+	matches, kp1, kp2 = findMatches(img1, img2, debug)
 
-	h, hInv = RANSAC(matches, iterations, threshold, img1, img2)
+	h, hInv = RANSAC(matches, iterations, threshold, img1, img2, kp1, kp2)
 
 	stitch(img1, img2, h, hInv)
 
