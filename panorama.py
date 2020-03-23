@@ -103,7 +103,7 @@ def computeInlierCount(H, matches, inlierThreshold, keypoints1, keypoints2):
 
 	for m in matches:
 		projection = project(keypoints1[m.queryIdx].pt[0], keypoints1[m.queryIdx].pt[1], H)
-		distSq = (projection[0] - keypoints1[m.trainIdx].pt[0])**2 + (projection[1] - keypoints1[m.trainIdx].pt[1])**2 
+		distSq = (projection[0] - keypoints2[m.trainIdx].pt[0])**2 + (projection[1] - keypoints2[m.trainIdx].pt[1])**2 
 
 		if distSq < inlierThreshold:
 			inliers += 1
@@ -120,7 +120,7 @@ def findInliers(matches, H, inlierThreshold, keypoints1, keypoints2):
 
 	for m in matches:
 		projection = project(keypoints1[m.queryIdx].pt[0], keypoints1[m.queryIdx].pt[1], H)
-		distSq = (projection[0] - keypoints1[m.trainIdx].pt[0])**2 + (projection[1] - keypoints1[m.trainIdx].pt[1])**2 
+		distSq = (projection[0] - keypoints2[m.trainIdx].pt[0])**2 + (projection[1] - keypoints2[m.trainIdx].pt[1])**2 
 
 		if distSq < inlierThreshold:
 			inliers.append(m)
@@ -129,7 +129,7 @@ def findInliers(matches, H, inlierThreshold, keypoints1, keypoints2):
 
 # takes a list of potentially matching points between two images 
 # returns the homography transformation and its inverse. 
-def RANSAC (matches, numIterations, inlierThreshold, img1, img2, keypoints1, keypoints2):
+def RANSAC (matches, numIterations, inlierThreshold, img1, img2, keypoints1, keypoints2, debug = False):
 	bestH = np.zeros((3,3))
 
 	numMatches = len(matches)
@@ -163,16 +163,20 @@ def RANSAC (matches, numIterations, inlierThreshold, img1, img2, keypoints1, key
 	#After iterations:
 	#find matches that are inliers using the "best" homography and the specified threshold
 	#compute another homography with all of the inliers (not just 4 points)
-
 	inliers = findInliers(matches, bestH, inlierThreshold, keypoints1, keypoints2)
 
-	#src = np.array([i[0].pt for i in inliers])
-	#dst = np.array([i[1].pt for i in inliers])
+	src = np.array([keypoints1[i.queryIdx].pt for i in inliers])	#is this what people call "pythonic" code?
+	dst = np.array([keypoints2[i.trainIdx].pt for i in inliers])
 
-	#bestH = cv.findHomography(src, dst, 0)[0]
+	bestH = cv.findHomography(src, dst, 0)[0]
 
 	#Finally, displaying the inlier matches
-	#inlierImg = cv.drawMatches()
+	inlierImg = cv.drawMatches(img1, keypoints1, img2, keypoints2, inliers, None, flags = 2)
+
+	if debug:
+		showImg("Inliers", inlierImg)
+
+	cv.imwrite(RESULTS_DIR + "3.png", inlierImg)
 
 	return bestH, np.linalg.inv(bestH)
 
@@ -190,7 +194,7 @@ def main():
 	img1 = cv.imread(IMG_1_PATH)
 	img2 = cv.imread(IMG_2_PATH)
 
-	debug = False
+	debug = True
 
 	iterations = 100
 	threshold = 1
@@ -202,7 +206,7 @@ def main():
 	#Mandatory step 3: find features of mount rainier 2, save in 1c.png
 	matches, kp1, kp2 = findMatches(img1, img2, debug)
 
-	h, hInv = RANSAC(matches, iterations, threshold, img1, img2, kp1, kp2)
+	h, hInv = RANSAC(matches, iterations, threshold, img1, img2, kp1, kp2, debug)
 
 	stitch(img1, img2, h, hInv)
 
