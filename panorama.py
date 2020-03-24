@@ -4,6 +4,7 @@
 import cv2 as cv
 import numpy as np
 import random
+import math
 
 IMG_1_PATH = "project_images/Rainier1.png"
 IMG_2_PATH = "project_images/Rainier2.png"
@@ -181,21 +182,49 @@ def RANSAC (matches, numIterations, inlierThreshold, img1, img2, keypoints1, key
 	return bestH, np.linalg.inv(bestH)
 
 
-# Stitches the images together to produce the result panorama
+# Stitches the images together using H and its inverse to produce the panorama
 def stitch(img1, img2, hom, homInv):
 	sitchImg = 0
 
+	#first, compute the size of the panorama. Project the corners of img2 on img1 with inverse of H. Allocate memory for the panorama.
+	img1Height = img1.shape[0]
+	img1Width = img1.shape[1]
 
+	img2Height = img2.shape[0]
+	img2Width = img2.shape[1]
 
-	return sitchImg
+	topLeft = project(0, 0, homInv)
+	topRight = project(img2Width, 0, homInv)
+	bottomLeft = project(0, img2Height, homInv)
+	bottomRight = project(img2Width, img2Height, homInv)
 
+	panoTop = min(topLeft[1], topRight[1])
+	panoBottom = max(bottomLeft[1], bottomRight[1], img1Height)
+	panoLeft = min(topLeft[0], bottomLeft[0], 0)
+	panoRight = max(topRight[0], bottomRight[0])
+
+	panoWidth = math.ceil(abs(panoLeft) + abs(panoRight))
+	panoHeight = math.ceil(abs(panoTop) + abs(panoBottom))
+
+	stitchImg = np.zeros((panoHeight, panoWidth, 3), np.uint8)
+
+	#second, copy img1 onto the panorama
+	xDiff = int(0 - panoLeft)
+	yDiff = int(0 - panoTop)
+	
+	for y in range(img1Height):
+		for x in range(img1Width):
+			stitchImg[y+yDiff][x+xDiff] = img1[y][x]
+
+	#third, for every pixel p in the panorama, project p onto img2. If it's correctly inside img2, blend the pixel values of img2 and panorama.
+	#	protip: use bilinear interpolation to get pixel values of img2 -> cv.getRectSubPix(image, patchSize, center[, patch[, patchType]]
+	
 
 def main():
 	img1 = cv.imread(IMG_1_PATH)
 	img2 = cv.imread(IMG_2_PATH)
 
-	debug = True
-
+	debug = False
 	iterations = 100
 	threshold = 1
 
