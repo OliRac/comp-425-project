@@ -23,12 +23,12 @@ Saves all progress in the "results" directory under images:
  - 3.png (removal of outliers)
  - 4.png (stitching)
  
- The program is configured to present progress at each step; press any key for the program to continue when it does.
+The program is configured to present progress at each step; press any key for the program to continue when it does.
  
- ## Variables
+## Variables
  
- The number of irations for RANSAC can be modified at line 13 with the ITERATIONS variable. (default = 1000)
+The number of iterations for RANSAC can be modified at line 13 with the ITERATIONS variable. (default = 1000)
  
- The threshold for RANSAC can be modified at line 14 with the THRESHOLD variable. (default = 0.995)
+The threshold for RANSAC can be modified at line 14 with the THRESHOLD variable. (default = 0.995)
  
- To prevent the program from showing progress at each step, DEBUG_MODE can be set to False at line 16.
+To prevent the program from showing progress at each step, DEBUG_MODE can be set to False at line 16.
