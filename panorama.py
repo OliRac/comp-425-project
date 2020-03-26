@@ -13,7 +13,7 @@ RESULTS_DIR = "results/"
 ITERATIONS = 1000
 THRESHOLD = 0.995
 
-DEBUG_MODE = False
+DEBUG_MODE = True
 
 
 #Utility function to show an image and wait for key press
@@ -83,9 +83,9 @@ def project(x1, y1, H):
 	# x2 = u / w
 	# y2 = v / w
 
-	newP = np.matmul(H, (x1, y1, 1))	#Oddly, some times I get a runtime error here (program still completes). I have yet to find the cause...
+	newP = np.matmul(H, (x1, y1, 1))	#Oddly, some times I get a runtime warning here (program still completes). Cause: H is filled of NaN / None values.
 
-	#some times, I get w = 0 :\
+	#In the case of H being filled with None, w = 0....
 	if newP[2] == 0:
 		return newP[0], newP[1]
 
@@ -235,6 +235,7 @@ def main():
 	panorama = stitch(img1, img2, h, hInv)
 
 	showImg("Panorama", panorama)
+
 	cv.destroyAllWindows()
 
 if __name__ == '__main__':
