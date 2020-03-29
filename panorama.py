@@ -1,5 +1,5 @@
 # By Olivier Racette, 40017231
-# COMP 425 Term project: panorama image stitching
+# COMP 425 Term project: panorama img stitching
 
 import cv2 as cv
 import numpy as np
@@ -16,20 +16,126 @@ THRESHOLD = 0.995
 DEBUG_MODE = True
 
 
-#Utility function to show an image and wait for key press
+#Utility function to show an img and wait for key press
 def showImg(title, img):
 	cv.imshow(title, img)
 	cv.waitKey(0)
 
 
+#c(H)
+#Where H is the Harris matrix
+def cornerStrength(H):
+	#det 	[a b 
+	#		c d] 
+	# 	= ad-bc
+
+	#trace	[a b
+	# 		c d] 
+	#	= a+d
+
+	det = H[0,0] * H[1,1] - H[0,1] * H[1,0]
+	trace = H[0,0] + H[1,1]
+
+	#I get trace = 0 for some pixels...nobody likes to divide by 0
+	if trace == 0:
+		trace = 0.0000001
+
+	return det / trace
+
+
+#Computes the Harrix matrix for each pixel
+#Note that in the pdf, 'I' means img derivative!
+#Returns KeyPoints found
+#code from A2
+def harrisDetector(img, windowSize, threshold):
+	#print("Detecting features...")
+
+	properties = img.shape
+	height = properties[0]
+	width = properties[1]
+
+	#Converting the img to floating point grayscale...(from 0 to 1)
+	gray = np.float32(cv.cvtColor(img,cv.COLOR_BGR2GRAY)) / 255
+
+	#From lab 2, to get derivatives of img
+	#sobel_X = np.array([[1, 0, -1], [2, 0, -2], [1, 0, -1]]) #* (1/8)
+	#sobel_Y = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]]) #* (1/8)
+
+	#computing derivatives
+	dx = cv.Sobel(gray, -1, 1, 0) #cv.filter2D(img,-1,sobel_X) --> unsure I can use built-in Sobel function...
+	dy = cv.Sobel(gray, -1, 0, 1) #cv.filter2D(img,-1,sobel_Y)
+	dxdy = dx*dy
+
+	dx2 = dx**2
+	dy2 = dy**2
+
+	#smoothing the derivatives with GaussianBlur of size 3*3, std dev 1.5
+	dx2 = cv.GaussianBlur(dx2, (3, 3), 1.5)
+	dy2 = cv.GaussianBlur(dy2, (3, 3), 1.5)
+	dxdy = cv.GaussianBlur(dxdy, (3, 3), 1.5)
+
+	#list to hold all of the results
+	keypoints = []
+
+	#temporary img to hold all the corner vales for each pixel
+	cValues = np.zeros((height, width))
+
+	windowOffset = (int)(windowSize/2)
+
+	#Here we need to pass through the img with a "window" of x,y pixels
+	for y in range(height):
+		for x in range(width):
+			xStart = x - windowOffset
+			xEnd = x + windowOffset
+
+			yStart = y - windowOffset
+			yEnd = y + windowOffset
+
+			#Taking advantage of numpy array slicing
+			#Having for loops here drastically impacts performance!!
+			dx2Vals = dx2[yStart:yEnd, xStart:xEnd]
+			dy2Vals = dy2[yStart:yEnd, xStart:xEnd]
+			dxdyVals = dxdy[yStart:yEnd, xStart:xEnd]
+
+			dx2Sum = dx2Vals.sum()
+			dy2Sum = dy2Vals.sum()
+			dxdySum = dxdyVals.sum()
+
+			H = np.array([[dx2Sum, dxdySum],[dxdySum, dy2Sum]], dtype=np.float32)
+
+			cValues[y][x] = cornerStrength(H)
+
+	smoothed = cv.GaussianBlur(gray, (3, 3), 1.5)
+
+	#Now looping over the corner strengths to check which are valid
+	for y in range(height):
+		for x in range(width):
+			#Need to check if c is over the user-defined threshold
+			#Then check if its a local maximum in at least a 3x3 neighborhood
+			if cValues[y][x] > threshold:
+				if cValues[y][x] >= np.amax(cValues[y-2:y+2, x-2:x+2]):
+					xDiff = smoothed[y][x+1] - smoothed[y][x-1]
+					yDiff = smoothed[y+1][x] - smoothed[y-1][x]
+					#angle = calcOrientation(xDiff, yDiff)
+
+					#Keypoint constructor:
+					#float x, float y, float _size, float _angle=-1, float _response=0, int _octave=0, int _class_id=-1
+					keypoints.append(cv.KeyPoint(x, y, windowSize, 0, cValues[y][x], 0, -1))
+
+	return np.asarray(keypoints)
+
+
 #Uses openCV's SIFT implementation to get keypoints and make their descriptors
 def findFeatures(img, save, debug = False):
 	gray = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
+	
+	keypoints = harrisDetector(img, 9, 10)
 
 	#NOTE: I compiled openCV with contrib and the ENABLE_NON_FREE tag
 	sift = cv.xfeatures2d.SIFT_create()
 
-	keypoints, descriptors = sift.detectAndCompute(gray, None)
+	#keypoints, descriptors = sift.detectAndCompute(gray, None)
+	keypoints, descriptors = sift.compute(gray, keypoints)
 
 	result = cv.drawKeypoints(img, keypoints, None, color=(0,255,0), flags = 0)
 
@@ -49,12 +155,14 @@ def findMatches(img1, img2, debug = False):
 	kp2, desc2 = findFeatures(img2, RESULTS_DIR + "1c.png", debug)
 
 	matcher = cv.BFMatcher()
-	matches = matcher.knnMatch(desc1, desc2, k=2)	#to apply ratio test, we need k = 2
+	matches = matcher.knnMatch(desc1, desc2, 2)	#to apply ratio test, we need k = 2
 
 	ratio = 0.8 	#proposed by David Lowe in his paper
 
 	goodMatches = []
 
+	#ratio test: 
+	# d1 / d2 < ratio --> d1 < ratio * d2 (to prevent division by 0)
 	for i in range(len(matches)):
 		if matches[i][0].distance < ratio * matches[i][1].distance:
 			goodMatches.append(matches[i][0])
@@ -177,13 +285,13 @@ def stitch(img1, img2, hom, homInv):
 	img2Height = img2.shape[0]
 	img2Width = img2.shape[1]
 
-	#Getting the four corners of the projection of image 2 onto image 1
+	#Getting the four corners of the projection of img 2 onto img 1
 	topLeft = project(0, 0, homInv)
 	topRight = project(img2Width, 0, homInv)
 	bottomLeft = project(0, img2Height, homInv)
 	bottomRight = project(img2Width, img2Height, homInv)
 
-	#Panorama sides relative to image 1
+	#Panorama sides relative to img 1
 	panoTop = min(topLeft[1], topRight[1], 0)
 	panoBottom = max(bottomLeft[1], bottomRight[1], img1Height)
 	panoLeft = min(topLeft[0], bottomLeft[0], 0)
@@ -198,14 +306,14 @@ def stitch(img1, img2, hom, homInv):
 	xOffset = math.ceil(0 - panoLeft)
 	yOffset = math.ceil(0 - panoTop)
 
-	#Perhaps theres a better way to copy an image onto another...These are just numpy arrays after all. For now this will do fine.
+	#Perhaps theres a better way to copy an img onto another...These are just numpy arrays after all. For now this will do fine.
 	for y in range(img1Height):
 		for x in range(img1Width):
 			stitchImg[y+yOffset][x+xOffset] = img1[y][x]
 
 
 	#Third, for every pixel p in the panorama, project p onto img2. If it's correctly inside img2, blend the pixel values of img2 and panorama.
-	#	protip: use bilinear interpolation to get pixel values of img2 -> cv.getRectSubPix(image, patchSize, center[, patch[, patchType]]
+	#	protip: use bilinear interpolation to get pixel values of img2 -> cv.getRectSubPix(img, patchSize, center[, patch[, patchType]]
 	for y in range(panoHeight):
 		for x in range(panoWidth):
 			xp, yp = project(x-xOffset, y-yOffset, hom)
