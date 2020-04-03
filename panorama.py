@@ -300,8 +300,8 @@ def stitch(img1, img2, hom, homInv):
 	stitchImg = np.zeros((panoHeight, panoWidth, 3), np.uint8)	#always mind the type!
 
 	#Second, copy img1 onto the panorama
-	xOffset = math.ceil(0 - panoLeft)
-	yOffset = math.ceil(0 - panoTop)
+	xOffset = math.ceil(-panoLeft)
+	yOffset = math.ceil(-panoTop)
 
 	#Perhaps theres a better way to copy an img onto another...These are just numpy arrays after all. For now this will do fine.
 	for y in range(img1Height):
