@@ -32,3 +32,8 @@ The number of iterations for RANSAC can be modified at line 13 with the ITERATIO
 The threshold for RANSAC can be modified at line 14 with the THRESHOLD variable. (default = 0.995)
  
 To prevent the program from showing progress at each step, DEBUG_MODE can be set to False at line 16.
+
+
+## Other Notes
+
+My corner detection isn't as precise as I would want it to be (observable with the first image; the keypoints aren't aligned perfectly with the cube corners) but it still works well enough to build a panorama.

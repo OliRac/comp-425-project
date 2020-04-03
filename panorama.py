@@ -54,16 +54,12 @@ def harrisDetector(img, windowSize, threshold):
 	height = properties[0]
 	width = properties[1]
 
-	#Converting the img to floating point grayscale...(from 0 to 1)
+	#Converting the img to floating point grayscale...(from 0 to 1) --> not needed anymore, its done outside the function
 	gray = np.float32(cv.cvtColor(img,cv.COLOR_BGR2GRAY)) / 255
 
-	#From lab 2, to get derivatives of img
-	#sobel_X = np.array([[1, 0, -1], [2, 0, -2], [1, 0, -1]]) #* (1/8)
-	#sobel_Y = np.array([[1, 2, 1], [0, 0, 0], [-1, -2, -1]]) #* (1/8)
-
 	#computing derivatives
-	dx = cv.Sobel(gray, -1, 1, 0) #cv.filter2D(img,-1,sobel_X) --> unsure I can use built-in Sobel function...
-	dy = cv.Sobel(gray, -1, 0, 1) #cv.filter2D(img,-1,sobel_Y)
+	dx = cv.Sobel(gray, -1, 1, 0)
+	dy = cv.Sobel(gray, -1, 0, 1)
 	dxdy = dx*dy
 
 	dx2 = dx**2
@@ -134,7 +130,8 @@ def findFeatures(img, save, debug = False):
 	#NOTE: I compiled openCV with contrib and the ENABLE_NON_FREE tag
 	sift = cv.xfeatures2d.SIFT_create()
 
-	#keypoints, descriptors = sift.detectAndCompute(gray, None)
+	#keypoints, descriptors = sift.detectAndCompute(gray, None) 	#Changed this to only use compute and use my own corner detection
+	#My corner detection is much less efficient but it still works
 	keypoints, descriptors = sift.compute(gray, keypoints)
 
 	result = cv.drawKeypoints(img, keypoints, None, color=(0,255,0), flags = 0)
